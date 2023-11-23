@@ -100,7 +100,7 @@ export function init(href) {
 
 function parsePath(hreflist = [""]) {
   const list = []
-  validateType(is.array, hreflist)
+  validate(is.array, hreflist)
 
   for (let i = 0; i < hreflist.length; i++) {
     let str = hreflist[i]
