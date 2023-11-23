@@ -10,7 +10,7 @@ export const sep = (
 )
 
 const sep2 = sep + sep
-const regExpSep = /[\/\\]+/gm
+const regExpSep = /[\\\/]+/gm
 const regExpProtocol = /:[\\\/]{2}/gm
 
 export function init(href) {
