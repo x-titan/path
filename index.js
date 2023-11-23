@@ -228,22 +228,24 @@ export function join(...hreflist) {
   for (let i = 0; i < hreflist.length; i++) {
     let { protocol, list } = init(hreflist[i])
 
-    if (i === 0 && protocol !== "") {
+    if (i === 0 && protocol !== "" && !protocol.endsWith(sep)) {
       out = protocol + sep2
     }
 
-    if (list[0] === "..") {
-      arr.pop()
-      if (i !== 0) {
-        list.shift()
+    for (const text of list) {
+      if (text === "..") {
+        arr.pop()
+        if (i !== 0) {
+          list.shift()
+        }
       }
+      if (text !== "") arr.push(text)
     }
-
-    arr.push(...list)
   }
 
   return out + arr.join(sep)
 }
+console.log(join(location.href, "readme.md"))
 
 export function isAbsolute(href) {
 
