@@ -245,7 +245,6 @@ export function join(...hreflist) {
 
   return out + arr.join(sep)
 }
-console.log(join(location.href, "readme.md"))
 
 export function isAbsolute(href) {
 
