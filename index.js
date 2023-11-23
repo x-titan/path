@@ -1,4 +1,4 @@
-import { is, each, validateType, makeValidator } from "https://x-titan.github.io/utils/index.js"
+import { is, each, validate, makeValidator } from "https://x-titan.github.io/utils/index.js"
 
 
 const validString = makeValidator(is.str)
