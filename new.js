@@ -103,9 +103,45 @@ function _getSearch(url = "") {
   const j = url.slice(i)
   return ((j + " ").slice(0, j.indexOf("#")) || "")
 }
+log(location)
 
+/**
+ * https://www.host:port.com
+ */
+function _getOrigin(url = "") {
+  validateString(url)
+  url = _splitUrl(url)
+
+  if (_isRoot(url[0])) { return (url[0] + url[1]) }
+  return url[0]
+}
+/**
+ * www.host.com
+ */
+function _getHostName(url) {
+  url = _getOrigin(url)
+  if(_isRoot(url)){
+
+  }
+  return url
+}
+/**
+ * www.host:port.com
+ */
 function _getHost() {
 
+}
+/**
+ * port
+ */
+function _getPort() {
+
+}
+/**
+ * fullhref
+ */
+function _getHref(url) {
+  return validateString(url)
 }
 
 function _getSign(str) {
@@ -234,11 +270,12 @@ export function parse(url) {
     dir: dirname(url),
     name: basename(url),
     ext: extname(url),
-    pathname,
+    origin: _getOrigin(url),
+    pathname: _getPathname(url),
     host: _getHost(url),
+    hostname: _getHostName(url),
     hash: _getHash(url),
     search: _getSearch(url),
-
   }
 }
 //#endregion
