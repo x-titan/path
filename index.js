@@ -1,7 +1,34 @@
 import { is, each, validate, makeValidator } from "https://x-titan.github.io/utils/index.js"
+import { List } from "https://x-titan.github.io/list/index.js"
 
+//
+//      ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+//      │                                            href                                             │
+//      ├──────────┬──┬─────────────────────┬─────────────────────┬───────────────────────────┬───────┤
+//      │ protocol │  │        auth         │        host         │           path            │ hash  │
+//      │          │  │                     ├──────────────┬──────┼──────────┬────────────────┤       │
+//      │          │  │                     │   hostname   │ port │ pathname │     search     │       │
+//      │          │  │                     │              │      │          ├─┬──────────────┤       │
+//      │          │  │                     │              │      │          │ │    query     │       │
+//      "  https:   //    user   :   pass   @ sub.host.com : 8080   /p/a/t/h  ?  query=string   #hash "
+//      │          │  │          │          │   hostname   │ port │          │                │       │
+//      │          │  │          │          ├──────────────┴──────┤          │                │       │
+//      │ protocol │  │ username │ password │        host         │          │                │       │
+//      ├──────────┴──┼──────────┴──────────┼─────────────────────┤          │                │       │
+//      │   origin    │                     │       origin        │ pathname │     search     │ hash  │
+//      ├─────────────┴─────────────────────┴─────────────────────┴──────────┴────────────────┴───────┤
+//      │                                            href                                             │
+//      └─────────────────────────────────────────────────────────────────────────────────────────────┘
+//
 
-const validString = makeValidator(is.str)
+//
+//      ┌─────────────────────┬────────────┐
+//      │         dir         │    base    │
+//      ├──────┐              ├──────┬─────┤
+//      │ root │              │ name │ ext │
+//      " C:\      path\dir   \ file  .txt "
+//      └──────┴──────────────┴──────┴─────┘
+//
 
 export const sep = (
   (is.defined(globalThis.document))
@@ -10,250 +37,302 @@ export const sep = (
 )
 
 const sep2 = sep + sep
-const regExpSep = /[\\\/]+/gm
-const regExpProtocol = /:[\\\/]{2}/gm
+const regExpSep = /[\\\/]+/
+const regExpSep1 = /[\\\/]/g
+const regExpSep2 = /[\\\/]{2,}/g
+const regExpRoot = /^[a-zA-Z0-9]+:/
+const regExpRootWithSep = /^[a-zA-Z0-9]+:[\\\/]*/
+const regExpOrigin = /^(?<root>\w+\:[\\\/]*)?(?<auth>[\w\d]+:[\w\d]+@)?(?<hostname>[\w\d\_\-]+\.?[\w\d\_\-\.]*)(?<port>:[\w\d]+)?/
+const regExpAuth = /[\w\d]+:[\w\d]+@/
 
-export function init(href) {
-  validString(href)
-  href = href.trim()
+//#region utils
+/**
+ * @type {(value: any) => (string)}
+ */
+const validateString = makeValidator(is.str)
 
-  const protocolExec = regExpProtocol.exec(href)
-
-  let host = ""
-  let hash = ""
-  let search = ""
-  let protocol = ""
-  let path = ""
-  let pathname = ""
-
-  if (protocolExec) {
-    const index = protocolExec.index
-    protocol = href.slice(0, index + 1).trim()
-    href = href.slice(index + 3).trim()
-  }
-
-  const searchIndex = href.indexOf("?")
-  const hashIndex = href.indexOf("#")
-
-  if (searchIndex !== -1 && hashIndex !== -1) {
-    if (searchIndex > hashIndex) {
-      hash = href.slice(hashIndex, searchIndex)
-      search = href.slice(searchIndex)
-    } else {
-      search = href.slice(searchIndex, hashIndex)
-      hash = href.slice(hashIndex)
-    }
-    href = href.slice(0, Math.min(searchIndex, hashIndex))
-  } else {
-    if (searchIndex !== -1) {
-      search = href.slice(searchIndex)
-      href = href.slice(0, searchIndex)
-    }
-    if (hashIndex !== -1) {
-      hash = href.slice(hashIndex)
-      href = href.slice(0, hashIndex)
-    }
-  }
-
-  const splittedHref = href.split(regExpSep)
-  // const list = []
-
-  const list = parsePath(splittedHref)
-
-  // for (let i = 0; i < splittedHref.length; i++) {
-  //   let str = splittedHref[i].trim()
-
-  //   if (str === "" && i !== splittedHref.length - 1 && i !== 0) {
-  //     continue
-  //   }
-
-  //   if (str === "." && i !== 0) {
-  //     continue
-  //   }
-
-  //   if (str === ".." && list.length !== 0 && i !== 0) {
-  //     list.pop()
-  //     continue
-  //   }
-
-  //   list.push(str.trim())
-  // }
-
-  path = list.join(sep)
-  pathname = path
-  hash = hash.trim()
-  search = search.trim()
-
-  if (protocolExec) {
-    host = list[0]
-    // if()
-    pathname = pathname.replace(host, "")
-  }
-
-  href = path + search + hash
-  if (protocolExec) {
-    href = protocol + sep2 + href
-  }
-
-  return { href, protocol, search, host, path, pathname, hash, list }
+function _splitPath(path = "") {
+  return validateString(path).split(regExpSep)
 }
 
-function parsePath(hreflist = [""]) {
-  const list = []
-  validate(is.array, hreflist)
-
-  for (let i = 0; i < hreflist.length; i++) {
-    let str = hreflist[i]
-    let cache = null
-    let push = true
-
-    if (is.array(str)) {
-      cache = parsePath(str)
-      str = cache.shift()
-    }
-
-    validString(str)
-
-    if (str === "") {
-      if ((list.length === 0) || (i === (hreflist.length - 1) && !cache)) {
-        list.push(str)
-      }
-      push = false
-    }
-    if (str === ".") {
-      if (list.length === 0) {
-        list.push(str)
-      }
-      push = false
-    }
-    if (str === "..") {
-      if (list[list.length - 1] === ".." || list.length === 0) {
-        list.push(str)
-      } else {
-        list.pop()
-      }
-      push = false
-    }
-    push && list.push(str.trim())
-    if (cache) {
-      list.push(...cache)
-      if (list[list.length - 1] === "" && i !== (hreflist.length - 1)) {
-        list.pop()
-      }
-    }
-  }
-  return list
+function _normSeparates(path = "") {
+  return validateString(path).split(regExpSep).join(sep)
 }
 
-export function normalize(href) {
-  return init(href).href
+function _isRoot(path = "") {
+  return is.str(path) && (path.indexOf(":") !== -1)
 }
 
-export function basename(href, ext) {
-  let { pathname } = init(href)
+function _getRoot(path = "") {
+  const root = regExpRoot.exec(validateString(path))
 
-  let out = pathname.slice(pathname.lastIndexOf(sep) + 1)
-
-  if (is.defined(ext)) {
-    validString(ext)
-
-    if (out.endsWith(ext)) {
-      out = out.slice(0, out.lastIndexOf(ext))
-    } else {
-      const i = out.lastIndexOf(".")
-      if (i !== -1) {
-        out = out.slice(0, i)
-      }
-      out = out + ext
-    }
-  }
-
-  return out
+  if (root) {
+    return root[0]
+  } else { return "" }
 }
 
-export function dirname(href) {
-  let { list, protocol } = init(href)
-  let out = ""
+function _getRootWithSep(path = "") {
+  const root = regExpRootWithSep.exec(validateString(path))
 
-  if (protocol !== "") {
-    out = protocol + sep2
-  }
-
-  list.pop()
-  return out + list.join(sep)
+  if (root) {
+    return (root[0]
+      .replace(regExpSep1, sep)
+      .replace(regExpSep2, sep2)
+    )
+  } else { return "" }
 }
 
-export function extname(href = "") {
-  const base = basename(href)
-  const lastIndex = base.lastIndexOf(".")
+function _getHash(path = "") {
+  const i = validateString(path).indexOf("#")
 
-  if (lastIndex > 0) {
-    return base.slice(lastIndex)
-  }
+  if (i === -1) { return "" }
 
-  return ""
+  const j = path.slice(i)
+  return ((j + " ").slice(0, j.indexOf("?")) || "")
 }
 
-export function parse(href) {
-  const _ = init(href)
-  _.base = basename(_.pathname)
-  _.dir = dirname(href)
-  _.root = _.host
-  _.ext = extname(_.pathname)
-  _.name = basename(_.basename, _.ext)
-  _.list = undefined
-  delete _.list
-  return _
+function _getSearch(path = "") {
+  const i = validateString(path).indexOf("?")
+
+  if (i === -1) { return "" }
+
+  const j = path.slice(i)
+  return ((j + " ").slice(0, j.indexOf("#")) || "")
 }
 
-export function join_(...hreflist) {
-  let out = ""
-  const arr = []
+/**
+ * https://www.host:port.com
+ */
+function _getOrigin(path = "") {
+  path = validateString(path).trim()
+  const origin = RegExp(regExpOrigin.source).exec(path)
 
-  for (let i = 0; i < hreflist.length; i++) {
-    const { list, protocol } = init(hreflist[i])
-    if (i === 0 && protocol !== "") {
-      out = protocol + sep2
-    }
-    arr.push(...list)
+  if (origin) {
+    path = origin[0].replace(origin.groups?.auth || "", "")
+  } else { path = "" }
+
+  return (path
+    .replace(regExpSep1, sep)
+    .replace(regExpSep2, sep2)
+    .trim()
+  )
+}
+
+/**
+ * www.host:port.com
+ */
+function _getHost(path = "") {
+  path = validateString(path).trim()
+  const origin = RegExp(regExpOrigin.source).exec(path)
+
+  if (origin) {
+    return (origin.groups?.hostname || "") + (origin.groups?.port || "")
+  } else { return "" }
+}
+
+/**
+ * www.host.com
+ */
+function _getHostName(path = "") {
+  path = validateString(path).trim()
+  const origin = RegExp(regExpOrigin.source).exec(path)
+
+  if (origin) {
+    return (origin.groups?.hostname || "")
+  } else { return "" }
+}
+
+/**
+ * port
+ */
+function _getPort(path = "") {
+  path = validateString(path).trim()
+  const origin = RegExp(regExpOrigin.source).exec(path)
+  if (origin) {
+    return (origin.groups?.port || "").replace(":", "")
+  } else { return "" }
+}
+
+function _getPathName(path = "") {
+  path = validateString(path).trim()
+  const origin = RegExp(regExpOrigin.source).exec(path)
+
+  if (origin) {
+    path = path.replace(origin[0], "")
   }
 
-  return out + parsePath(arr).join(sep)
+  return (_normSeparates(path)
+    .replace(_getSearch(path), "")
+    .replace(_getHash(path), "")
+    .trim()
+  )
+
 }
 
-export function join(...hreflist) {
-  let out = ""
-  const arr = []
+function _getHref(path = "") {
+  path = validateString(path).trim()
+  const origin = _getOrigin(path)
+  const pathname = _getPathName(path)
+  const search = _getSearch(path)
+  const hash = _getHash(path)
 
-  for (let i = 0; i < hreflist.length; i++) {
-    let { protocol, list } = init(hreflist[i])
+  return origin + pathname + search + hash
+}
 
-    if (i === 0 && protocol !== "" && !protocol.endsWith(sep)) {
-      out = protocol + sep2
+function _getSign(str = "") {
+  let sign = 1
+  if (str === "" || str === ".") sign = 0
+  if (str === "..") sign = -1
+  return sign
+}
+
+function _norm(path = "") {
+  if (is.str(path)) (path = _splitPath(path))
+
+  const segmentList = List.fromArray(validate(is.arr, path))
+  const root = []
+  const normSegments = []
+
+  let seg = null
+
+  while (segmentList.length > 0) {
+    seg = segmentList.shift().value
+
+    if (is.arr(seg)) {
+      const nlist = List.fromArray(seg)
+      const last = nlist.last
+      last.node = segmentList.node
+      segmentList.node = nlist.node
+      continue
     }
 
-    for (const text of list) {
-      if (text === "..") {
-        arr.pop()
-        if (i !== 0) {
-          list.shift()
+    seg = validateString(seg).trim()
+    const sign = _getSign(seg)
+
+    if (normSegments.length === 0 && !_isRoot(root[0])) {
+      const r = root[0]
+
+      switch (sign) {
+        case (-1): {
+          if (r === "") { break }
+          if (r === ".") { root.length = 0 }
+          root.push(seg)
+          break
+        }
+        case (0): {
+          if (r === ".." || r === "." || r === "") { break }
+          root.push(seg)
+          break
+        }
+        case (1): {
+          if (_isRoot(seg) && root.length === 0) { root.push(seg) }
+          else { normSegments.push(seg) }
         }
       }
-      if (text !== "") arr.push(text)
+    } else {
+      switch (sign) {
+        case (-1): {
+          normSegments.pop()
+          if (normSegments.length === 0) { segmentList.unshift(".") }
+          break
+        }
+        case (1): {
+          normSegments.push(seg)
+        }
+      }
     }
   }
+  if (seg === "") { normSegments.push("") }
+  return root.concat(normSegments)
+}
+//#endregion
 
-  return out + arr.join(sep)
+//#region Export
+export function isAbsolute(path = "") {
+  return _normSeparates(path).startsWith(sep) || _isRoot(path)
 }
 
-export function isAbsolute(href) {
-
+export function normalize(path = "", shiftSegments = true) {
+  if (!!shiftSegments === true) {
+    return _norm(path).join(sep)
+  } else {
+    return _normSeparates(path)
+  }
 }
 
-export function relative(core, href) {
+export function join(...paths) {
+  const splittedPath = []
+  paths.forEach((path) => {
+    splittedPath.push(_splitPath(path))
+  })
 
+  return _norm(splittedPath).join(sep)
 }
 
-export function resolve(...hreflist) {
-
+export function dirname(path = "") {
+  path = _splitPath(path)
+  if (path.length === 0) return "."
+  const last = path.pop()
+  if (_isRoot(last)) {
+    return path.join(sep)
+  } else { return "" }
 }
+
+export function basename(path = "", ext = "") {
+  path = _splitPath(path)
+  path = path[path.length - 1]
+
+
+  if (is.str(ext)) {
+    if (path.endsWith(ext)) {
+      path = path.slice(0, path.lastIndexOf(ext))
+    }
+  }
+  return path
+}
+
+export function extname(path = "") {
+  path = _splitPath(path)
+  path = path[path.length - 1]
+
+  const lastIndex = path.substring(1).lastIndexOf(".")
+
+  if (lastIndex === -1) { return "" }
+  return path.slice(lastIndex)
+}
+
+/**
+ * For NodeJS
+ */
+export function parse(path = "") {
+  path = _normSeparates(path)
+  return {
+    root: _getRoot(path),
+    dir: dirname(path),
+    name: basename(path),
+    ext: extname(path),
+  }
+}
+
+/**
+ * For web JS
+ */
+export function init(path = "") {
+  path = _normSeparates(path)
+  return {
+    protocol: _getRoot(path),
+    href: _getHref(path),
+    origin: _getOrigin(path),
+    host: _getHost(path),
+    port: _getPort(path),
+    hostname: _getHostName(path),
+    pathname: _getPathName(path),
+    search: _getSearch(path),
+    hash: _getHash(path),
+  }
+}
+
+export function format(pathObject) { }
+export function relative(from, to) { }
+export function resolve(...path) { }
+//#endregion
